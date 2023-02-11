@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/Netflix/go-env"
 	"github.com/YusufOzmen01/veri-kontrol-backend/core/sources"
 	locationsRepository "github.com/YusufOzmen01/veri-kontrol-backend/repository/locations"
@@ -13,8 +19,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/sirupsen/logrus"
-	"math/rand"
-	"time"
 )
 
 type Environment struct {
@@ -277,7 +281,17 @@ func main() {
 		return c.SendString("Successfully added!")
 	})
 
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT)
+	signal.Notify(c, syscall.SIGTERM)
+
+	go func() {
+		_ = <-c
+		fmt.Println("application gracefully shutting down..")
+		_ = app.Shutdown()
+	}()
+
 	if err := app.Listen(":80"); err != nil {
-		panic(err)
+		panic(fmt.Sprintf("app error: %s", err.Error()))
 	}
 }

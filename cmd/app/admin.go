@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+
 	"github.com/YusufOzmen01/veri-kontrol-backend/core/sources"
 	"github.com/YusufOzmen01/veri-kontrol-backend/repository/locations"
 	"github.com/YusufOzmen01/veri-kontrol-backend/tools"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
-	"strconv"
 )
 
 type Admin interface {
@@ -33,10 +34,6 @@ func (a *admin) GetLocationEntries(c *fiber.Ctx) error {
 	entries, err := a.locations.GetLocations(c.Context())
 	if err != nil {
 		return c.SendString(err.Error())
-	}
-
-	for _, entry := range entries {
-		entry.CreatedAt = entry.ID.Timestamp()
 	}
 
 	return c.JSON(entries)
