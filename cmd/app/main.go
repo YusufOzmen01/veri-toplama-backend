@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -261,6 +262,7 @@ func main() {
 		}
 
 		if err := locationRepository.ResolveLocation(ctx, &locationsRepository.LocationDB{
+			ID:               primitive.NewObjectIDFromTimestamp(time.Now()),
 			EntryID:          body.ID,
 			Type:             body.LocationType,
 			Location:         location,
