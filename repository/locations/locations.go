@@ -3,18 +3,18 @@ package locations
 import (
 	"context"
 	"github.com/YusufOzmen01/veri-kontrol-backend/core/sources"
+	"github.com/YusufOzmen01/veri-kontrol-backend/repository/users"
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Repository interface {
 	GetLocations(ctx context.Context) ([]*LocationDB, error)
-
 	ResolveLocation(ctx context.Context, location *LocationDB) error
-
 	IsResolved(ctx context.Context, locationID int) (bool, error)
-
 	IsDuplicate(ctx context.Context, tweetContents string) (bool, error)
+	GetDocumentsWithNoTweetContents(ctx context.Context) ([]*LocationDB, error)
 }
 
 type repository struct {
@@ -30,6 +30,7 @@ func NewRepository(mongo sources.MongoClient) Repository {
 type Location struct {
 	EntryID          int       `json:"entry_id"`
 	Loc              []float64 `json:"loc"`
+	Epoch            int       `json:"epoch"`
 	OriginalMessage  string    `json:"original_message"`
 	OriginalLocation string    `json:"original_location"`
 }
@@ -40,17 +41,19 @@ const (
 )
 
 type LocationDB struct {
-	EntryID          int       `json:"entry_id" bson:"entry_id"`
-	Location         []float64 `json:"location" bson:"location"`
-	Corrected        bool      `json:"corrected" bson:"corrected"`
-	Verified         bool      `json:"verified" bson:"verified"`
-	OriginalAddress  string    `json:"original_address" bson:"original_address"`
-	CorrectedAddress string    `json:"corrected_address" bson:"corrected_address"`
-	OpenAddress      string    `json:"open_address" bson:"open_address"`
-	Apartment        string    `json:"apartment" bson:"apartment"`
-	Type             int       `json:"type" bson:"type"`
-	Reason           string    `json:"reason" bson:"reason"`
-	TweetContents    string    `json:"tweet_contents" bson:"tweet_contents"`
+	ID               primitive.ObjectID `json:"_id" bson:"_id"`
+	EntryID          int                `json:"entry_id" bson:"entry_id"`
+	Sender           *users.User        `json:"sender" bson:"sender"`
+	Location         []float64          `json:"location" bson:"location"`
+	Corrected        bool               `json:"corrected" bson:"corrected"`
+	Verified         bool               `json:"verified" bson:"verified"`
+	OriginalAddress  string             `json:"original_address" bson:"original_address"`
+	CorrectedAddress string             `json:"corrected_address" bson:"corrected_address"`
+	OpenAddress      string             `json:"open_address" bson:"open_address"`
+	Apartment        string             `json:"apartment" bson:"apartment"`
+	Type             int                `json:"type" bson:"type"`
+	Reason           string             `json:"reason" bson:"reason"`
+	TweetContents    string             `json:"tweet_contents" bson:"tweet_contents"`
 }
 
 func (r *repository) GetLocations(ctx context.Context) ([]*LocationDB, error) {
@@ -109,4 +112,24 @@ func (r *repository) IsDuplicate(ctx context.Context, tweetContents string) (boo
 	}
 
 	return exists, nil
+}
+
+func (r *repository) GetDocumentsWithNoTweetContents(ctx context.Context) ([]*LocationDB, error) {
+	// FOR OLD DB COLLECTIONS ONLY, update the tweet_contents for old tweet data where it does not exist, or is empty
+	// Do not use in app
+	cur, err := r.mongo.Find(ctx, "locations", bson.D{{
+		Key:   "tweet_contents",
+		Value: nil,
+	}})
+	if err != nil {
+		return nil, err
+	}
+
+	locs := make([]*LocationDB, 0)
+	if err := cur.All(ctx, &locs); err != nil {
+		logrus.Errorln(err)
+		return nil, err
+	}
+
+	return locs, nil
 }

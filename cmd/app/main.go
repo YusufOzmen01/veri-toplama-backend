@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/Netflix/go-env"
 	"github.com/YusufOzmen01/veri-kontrol-backend/core/sources"
 	locationsRepository "github.com/YusufOzmen01/veri-kontrol-backend/repository/locations"
@@ -13,8 +19,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/sirupsen/logrus"
-	"math/rand"
-	"time"
 )
 
 type Environment struct {
@@ -64,7 +68,7 @@ func main() {
 
 	app.Use(cors.New())
 
-	entries := app.Group("/entries", func(c *fiber.Ctx) error {
+	adminG := app.Group("/admin", func(c *fiber.Ctx) error {
 		authKey := c.Get("Auth-Key")
 
 		user, err := userRepository.GetUser(ctx, authKey)
@@ -79,9 +83,11 @@ func main() {
 		return c.Next()
 	})
 
-	entries.Get("", admin.GetLocationEntries)
-	entries.Get("/:entry_id", admin.GetSingleEntry)
-	entries.Post("/:entry_id", admin.UpdateEntry)
+	entriesG := adminG.Group("/entries")
+
+	entriesG.Get("", admin.GetLocationEntries)
+	entriesG.Get("/:entry_id", admin.GetSingleEntry)
+	entriesG.Post("/:entry_id", admin.UpdateEntry)
 
 	app.Get("/monitor", monitor.New())
 
@@ -125,17 +131,79 @@ func main() {
 			locations = filteredLocations
 		}
 
-		randIndex := rand.Intn(len(locations))
-		selected := locations[randIndex]
+		startingAt := c.QueryInt("starting_at")
+		if startingAt > 0 {
+			filteredLocations := make([]*locationsRepository.Location, 0)
 
-		singleData, err := tools.GetSingleLocation(ctx, selected.EntryID)
-		if err != nil {
-			logrus.Errorln(err)
+			for _, loc := range locations {
+				if loc.Epoch >= startingAt {
+					filteredLocations = append(filteredLocations, loc)
+				}
+			}
 
-			return c.SendString(err.Error())
+			locations = filteredLocations
 		}
 
-		selected.OriginalMessage = singleData.FullText
+		if len(locations) == 0 {
+			return c.JSON(struct {
+				Count    int                           `json:"count"`
+				Location *locationsRepository.Location `json:"location"`
+			}{
+				Count:    0,
+				Location: nil,
+			})
+		}
+
+		var selected *locationsRepository.Location
+		fullText := ""
+		processed := make([]int, 0)
+
+		for {
+			randIndex := rand.Intn(len(locations))
+
+			if len(processed) == len(locations) {
+				return c.JSON(struct {
+					Count    int                           `json:"count"`
+					Location *locationsRepository.Location `json:"location"`
+				}{
+					Count:    0,
+					Location: nil,
+				})
+			}
+
+			for _, i := range processed {
+				if randIndex == i {
+					continue
+				}
+			}
+
+			processed = append(processed, randIndex)
+
+			s := locations[randIndex]
+
+			singleData, err := tools.GetSingleLocation(ctx, s.EntryID, cache)
+			if err != nil {
+				logrus.Errorln(err)
+
+				return c.SendString(err.Error())
+			}
+
+			exists, err := locationRepository.IsDuplicate(c.Context(), singleData.FullText)
+			if err != nil {
+				logrus.Errorln(err)
+
+				return c.SendString(err.Error())
+			}
+
+			if !exists {
+				selected = s
+				fullText = singleData.FullText
+
+				break
+			}
+		}
+
+		selected.OriginalMessage = fullText
 		selected.OriginalLocation = fmt.Sprintf("https://www.google.com/maps/?q=%f,%f&ll=%f,%f&z=21", selected.Loc[0], selected.Loc[1], selected.Loc[0], selected.Loc[1])
 
 		return c.JSON(struct {
@@ -167,17 +235,6 @@ func main() {
 			return c.SendString("this location is already checked")
 		}
 
-		// duplicate, err := locationRepository.IsDuplicate(ctx, body.TweetContents)
-		// if err != nil {
-		//	  logrus.Errorln(err)
-		//
-		//	return c.SendString(err.Error())
-		// }
-		//
-		// if duplicate {
-		// 	return c.SendString("This tweet already exists")
-		// }
-
 		locations, err := tools.GetAllLocations(ctx, cache)
 		if err != nil {
 			logrus.Errorln(err)
@@ -195,6 +252,14 @@ func main() {
 			}
 		}
 
+		var sender *usersRepository.User
+
+		authKey := c.Get("Auth-Key")
+		userData, err := userRepository.GetUser(c.Context(), authKey)
+		if err == nil {
+			sender = userData
+		}
+
 		if err := locationRepository.ResolveLocation(ctx, &locationsRepository.LocationDB{
 			EntryID:          body.ID,
 			Type:             body.LocationType,
@@ -203,6 +268,7 @@ func main() {
 			OriginalAddress:  originalLocation,
 			CorrectedAddress: body.NewAddress,
 			Reason:           body.Reason,
+			Sender:           sender,
 			OpenAddress:      body.OpenAddress,
 			Apartment:        body.Apartment,
 			TweetContents:    body.TweetContents,
@@ -215,7 +281,17 @@ func main() {
 		return c.SendString("Successfully added!")
 	})
 
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT)
+	signal.Notify(c, syscall.SIGTERM)
+
+	go func() {
+		_ = <-c
+		fmt.Println("application gracefully shutting down..")
+		_ = app.Shutdown()
+	}()
+
 	if err := app.Listen(":80"); err != nil {
-		panic(err)
+		panic(fmt.Sprintf("app error: %s", err.Error()))
 	}
 }

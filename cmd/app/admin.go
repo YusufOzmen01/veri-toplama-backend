@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+
 	"github.com/YusufOzmen01/veri-kontrol-backend/core/sources"
 	"github.com/YusufOzmen01/veri-kontrol-backend/repository/locations"
 	"github.com/YusufOzmen01/veri-kontrol-backend/tools"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
-	"strconv"
 )
 
 type Admin interface {
