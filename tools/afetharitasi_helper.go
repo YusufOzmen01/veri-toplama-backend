@@ -59,7 +59,7 @@ func GetSingleLocation(ctx context.Context, locationID int, cache sources.Cache)
 	if err := json.Unmarshal(resp, singleData); err != nil {
 		log.Errorln(string(resp))
 
-		return nil, err
+		panic(err)
 	}
 
 	cache.Set(fmt.Sprintf("single_location_%d", locationID), singleData, 0)
