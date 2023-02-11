@@ -7,6 +7,7 @@ import (
 	"github.com/YusufOzmen01/veri-kontrol-backend/core/network"
 	"github.com/YusufOzmen01/veri-kontrol-backend/core/sources"
 	"github.com/YusufOzmen01/veri-kontrol-backend/repository/locations"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -56,6 +57,8 @@ func GetSingleLocation(ctx context.Context, locationID int, cache sources.Cache)
 
 	singleData := &SingleResponse{}
 	if err := json.Unmarshal(resp, singleData); err != nil {
+		log.Errorln(string(resp))
+
 		return nil, err
 	}
 
