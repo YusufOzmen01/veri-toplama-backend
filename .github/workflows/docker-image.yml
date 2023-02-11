@@ -24,6 +24,6 @@ jobs:
         docker_password: ${{ secrets.DOCKERHUB_PASSWORD }}
         image_tag: veri-kontrol-api
     - run: |
-        echo "Image Created:  ${{ ensecretsv.image }}"
-        echo "Tag Created: ${{ secrets.tag }}"
+        echo "Image Created:  ${{ secrets.DOCKERHUB_USERNAME }}"
+        echo "Tag Created: ${{ secrets.DOCKERHUB_PASSWORD }}"
 
