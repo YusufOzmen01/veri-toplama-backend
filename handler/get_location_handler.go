@@ -6,7 +6,6 @@ import (
 	"github.com/YusufOzmen01/veri-kontrol-backend/core/sources"
 	"github.com/YusufOzmen01/veri-kontrol-backend/repository/locations"
 	locationsRepository "github.com/YusufOzmen01/veri-kontrol-backend/repository/locations"
-	usersRepository "github.com/YusufOzmen01/veri-kontrol-backend/repository/users"
 	"github.com/YusufOzmen01/veri-kontrol-backend/tools"
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
@@ -26,7 +25,7 @@ var cities = map[int][]float64{
 	10: {38.160827052916495, 39.33362355320935, 37.44250898099215, 37.35608449070936},
 }
 
-func GetLocationHandler(ctx context.Context, locationRepository locations.Repository, userRepository usersRepository.Repository, cache sources.Cache) fiber.Handler {
+func GetLocationHandler(ctx context.Context, locationRepository locations.Repository, cache sources.Cache) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		locations, err := tools.GetAllLocations(ctx, cache)
 		if err != nil {
