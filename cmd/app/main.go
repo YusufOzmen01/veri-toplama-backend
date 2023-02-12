@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/YusufOzmen01/veri-kontrol-backend/util"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -12,6 +11,9 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/YusufOzmen01/veri-kontrol-backend/handler"
+	"github.com/YusufOzmen01/veri-kontrol-backend/util"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
@@ -85,6 +87,8 @@ func main() {
 
 	logrus.Infoln("Startup complete")
 	app.Use(cors.New())
+
+	app.Get("/healthcheck", handler.Healtcheck)
 
 	adminG := app.Group("/admin", func(c *fiber.Ctx) error {
 		authKey := c.Get("Auth-Key")
