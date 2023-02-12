@@ -67,6 +67,19 @@ func main() {
 
 	admin := NewAdmin(locationRepository, cache)
 
+	processedIDs := make([]int, 0)
+
+	logrus.Infoln("Pulling entries")
+	locs, err := locationRepository.GetLocations(ctx)
+	if err != nil {
+		logrus.Errorf("Couldn't get all locations: %s", err)
+	}
+
+	for _, loc := range locs {
+		processedIDs = append(processedIDs, loc.EntryID)
+	}
+
+	logrus.Infoln("Startup complete")
 	app.Use(cors.New())
 
 	adminG := app.Group("/admin", func(c *fiber.Ctx) error {
@@ -100,16 +113,9 @@ func main() {
 			return c.SendString(err.Error())
 		}
 
-		locs, err := locationRepository.GetLocations(ctx)
-		if err != nil {
-			logrus.Errorln(err)
-
-			return c.SendString(err.Error())
-		}
-
-		for _, l := range locs {
+		for _, id := range processedIDs {
 			for i, loc := range locations {
-				if l.EntryID == loc.EntryID {
+				if id == loc.EntryID {
 					locations = append(locations[:i], locations[i+1:]...)
 
 					continue
@@ -225,15 +231,10 @@ func main() {
 			return c.SendString(err.Error())
 		}
 
-		exists, err := locationRepository.IsResolved(ctx, body.ID)
-		if err != nil {
-			logrus.Errorln(err)
-
-			return c.SendString(err.Error())
-		}
-
-		if exists {
-			return c.SendString("this location is already checked")
+		for _, id := range processedIDs {
+			if body.ID == id {
+				return c.SendString("this location is already checked")
+			}
 		}
 
 		locations, err := tools.GetAllLocations(ctx, cache)
@@ -279,6 +280,8 @@ func main() {
 
 			return c.SendString(err.Error())
 		}
+
+		processedIDs = append(processedIDs, body.ID)
 
 		return c.SendString("Successfully added!")
 	})
